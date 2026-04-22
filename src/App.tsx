@@ -1,149 +1,234 @@
-import { useMemo, useState } from 'react'
-import { BellRing, FileText, Gauge, Moon, ShieldCheck, Sun, TriangleAlert, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
-type PageId = 'dashboard' | 'salaries' | 'documents' | 'audit' | 'accidents' | 'reporting'
+type Period = 'monthly' | 'yearly'
 
-const pages: { id: PageId; label: string; icon: JSX.Element }[] = [
-  { id: 'dashboard', label: 'Tableau de bord', icon: <Gauge size={16} /> },
-  { id: 'salaries', label: 'Salariés & Habilitations', icon: <Users size={16} /> },
-  { id: 'documents', label: 'Documents', icon: <FileText size={16} /> },
-  { id: 'audit', label: 'Préparation Audit', icon: <ShieldCheck size={16} /> },
-  { id: 'accidents', label: "Accidents & Presqu'acc.", icon: <TriangleAlert size={16} /> },
-  { id: 'reporting', label: 'Reporting', icon: <BellRing size={16} /> },
+type Faq = {
+  q: string
+  a: string
+}
+
+const pricing = [
+  {
+    name: 'Starter',
+    desc: "Pour structurer rapidement la conformite d'une petite equipe industrielle.",
+    monthly: '99€',
+    yearly: '79€',
+    cta: 'Choisir Starter',
+    primary: false,
+    features: ['Jusqu\'a 10 salaries', 'Suivi des echeances cles', 'Tableau de bord centralise', 'Support email'],
+  },
+  {
+    name: 'Pro',
+    desc: 'Le meilleur equilibre pour une PME qui prepare serieusement ses audits.',
+    monthly: '199€',
+    yearly: '159€',
+    cta: 'Choisir Pro',
+    primary: true,
+    features: ['Jusqu\'a 30 salaries', 'Relances automatiques', 'Documents assistes par IA', "Preparation d'audit guidee"],
+  },
+  {
+    name: 'Business',
+    desc: 'Pour les structures multi-sites qui veulent industrialiser leur conformite.',
+    monthly: '399€',
+    yearly: '319€',
+    cta: 'Choisir Business',
+    primary: false,
+    features: ['Jusqu\'a 100 salaries', 'Gestion multi-sites', 'Exports audit avances', 'Accompagnement prioritaire'],
+  },
 ]
 
-const salaries = [
-  { name: 'Thomas Guerrin', role: 'Cariste', compliance: 62, status: 'Expiré' },
-  { name: 'Malik Diouf', role: 'Électricien', compliance: 75, status: 'Alerte' },
-  { name: 'Camille Roux', role: 'Technicienne qualité', compliance: 98, status: 'À jour' },
+const faqs: Faq[] = [
+  {
+    q: 'Quelles certifications sont couvertes ?',
+    a: 'Konform est pense pour piloter les exigences MASE et differents cadres ISO avec un suivi operationnel des preuves, habilitations et echeances.',
+  },
+  {
+    q: 'Faut-il etre expert QSE pour utiliser Konform ?',
+    a: "Non. L'interface est concue pour rester lisible cote terrain, RH ou direction, avec des reperes simples et des actions guidees.",
+  },
+  {
+    q: 'Comment les donnees sont-elles securisees ?',
+    a: "Les acces sont organises par roles, les actions sont tracables et l'hebergement est prevu en France.",
+  },
+  {
+    q: "Que se passe-t-il a la fin de l'essai gratuit ?",
+    a: 'Vous choisissez librement de continuer sur un plan payant ou d\'arreter.',
+  },
 ]
 
 export default function App() {
-  const [page, setPage] = useState<PageId>('dashboard')
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [accent, setAccent] = useState('#00e5a0')
+  const [scrolled, setScrolled] = useState(false)
+  const [period, setPeriod] = useState<Period>('monthly')
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
 
-  document.documentElement.dataset.theme = theme
-  document.documentElement.style.setProperty('--accent', accent)
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
-  const title = useMemo(() => pages.find((p) => p.id === page)?.label ?? 'Konform', [page])
+  useEffect(() => {
+    const items = Array.from(document.querySelectorAll<HTMLElement>('.fade-in'))
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.14, rootMargin: '0px 0px -48px 0px' },
+    )
+
+    items.forEach((item) => observer.observe(item))
+    return () => observer.disconnect()
+  }, [])
+
+  const periodLabel = useMemo(() => (period === 'yearly' ? '/mois, facture annuellement' : '/mois'), [period])
 
   return (
-    <div className="min-h-screen">
-      <div className="grid min-h-screen grid-cols-[260px_1fr]">
-        <aside className="glass border-r-white/15 p-4">
-          <div className="mb-6 flex items-center gap-3 border-b border-white/10 pb-4">
-            <div className="grid h-9 w-9 place-content-center rounded-xl bg-[var(--accent)] text-black">
-              <ShieldCheck size={16} />
+    <>
+      <header className={`site-header ${scrolled ? 'scrolled' : ''}`} id="site-header">
+        <div className="container nav">
+          <a className="logo" href="#top" aria-label="Konform accueil">
+            <span className="logo-mark">K</span>
+            <span>onform</span>
+          </a>
+          <nav className="nav-links" aria-label="Navigation principale">
+            <a className="nav-link" href="#produit">Produit</a>
+            <a className="nav-link" href="#fonctionnalites">Fonctionnalites</a>
+            <a className="nav-link" href="#tarifs">Tarifs</a>
+            <a className="nav-link" href="#faq">FAQ</a>
+          </nav>
+          <div className="nav-actions">
+            <a className="btn btn-secondary" href="#faq">Se connecter</a>
+            <a className="btn btn-primary" href="#cta-final">Essai gratuit</a>
+          </div>
+        </div>
+      </header>
+
+      <main id="top">
+        <section className="section hero" id="produit">
+          <div className="container hero-grid">
+            <div className="hero-copy fade-in">
+              <div className="hero-badge"><span className="pulse-dot" />Certifications MASE & ISO - Nouvelle approche</div>
+              <h1>La conformite, enfin sous controle.</h1>
+              <p className="hero-subtitle">Konform centralise vos certifications MASE et ISO. Habilitations, documents, audits - tout est automatise.</p>
+              <div className="hero-actions">
+                <a className="btn btn-primary" href="#cta-final">Demarrer gratuitement -&gt;</a>
+                <a className="btn btn-secondary" href="#dashboard">Voir la demo</a>
+                <span className="eyebrow-note">Aucune carte bancaire requise</span>
+              </div>
+              <div className="stat-bar glass">
+                <div className="stat-chip"><strong>3h</strong><span>/ semaine economisees</span></div>
+                <div className="stat-chip"><strong>0</strong><span>certification perdue</span></div>
+                <div className="stat-chip"><strong>14 jours</strong><span>d'essai offerts</span></div>
+              </div>
             </div>
-            <div>
-              <div className="font-display text-lg font-black">Konform</div>
-              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[10px] text-emerald-300">MASE</span>
+
+            <div className="hero-side fade-in fade-delay-2">
+              <div className="mini-dashboard glass hover-glow">
+                <div className="mini-top">
+                  <div><div className="mini-tag">Dashboard</div><h3>Vision temps reel de votre conformite</h3></div>
+                  <span className="badge">Audit pret</span>
+                </div>
+                <div className="mini-summary">
+                  <div className="mini-box"><span>Score site</span><strong>94%</strong></div>
+                  <div className="mini-box"><span>Echeances a traiter</span><strong>3</strong></div>
+                  <div className="mini-box"><span>Docs conformes</span><strong>47/50</strong></div>
+                </div>
+                <div className="mini-list">
+                  <div className="mini-row"><div><strong>Nadia M.</strong><br /><span>Travaux en hauteur</span></div><div>Validite 28/09/2026</div><span className="status ok">A jour</span></div>
+                  <div className="mini-row"><div><strong>Lucas P.</strong><br /><span>CACES R489</span></div><div>Validite 19/05/2026</div><span className="status warn">Bientot</span></div>
+                  <div className="mini-row"><div><strong>Thomas G.</strong><br /><span>Habilitation BT</span></div><div>Validite 08/04/2026</div><span className="status urgent">Urgent</span></div>
+                </div>
+              </div>
             </div>
           </div>
-          <nav className="space-y-2">
-            {pages.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setPage(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
-                  page === item.id
-                    ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
-                    : 'border-transparent text-white/80 hover:border-white/10 hover:bg-white/5'
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        </aside>
+        </section>
 
-        <main>
-          <header className="glass flex h-16 items-center justify-between border-x-0 border-t-0 px-6">
-            <div>
-              <h1 className="font-display text-lg font-black">{title}</h1>
-              <p className="text-xs text-white/60">Interface moderne React + Tailwind + TypeScript</p>
+        <section className="section" id="fonctionnalites">
+          <div className="container">
+            <div className="fade-in" style={{ maxWidth: 760, marginBottom: 30 }}>
+              <div className="section-label">La solution</div>
+              <h2>Tout ce dont vous avez besoin. Rien de superflu.</h2>
+              <p>Konform se concentre sur les gestes vraiment utiles pour piloter MASE et ISO dans une PME industrielle.</p>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1">
-              <button className={`rounded-full p-2 ${theme === 'dark' ? 'bg-[var(--accent)] text-black' : 'text-white/70'}`} onClick={() => setTheme('dark')}><Moon size={14} /></button>
-              <button className={`rounded-full p-2 ${theme === 'light' ? 'bg-[var(--accent)] text-black' : 'text-white/70'}`} onClick={() => setTheme('light')}><Sun size={14} /></button>
-              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-7 w-7 cursor-pointer rounded-full border border-white/20 bg-transparent p-0" />
+            <div className="feature-grid">
+              {[
+                ['01', '📊', 'Tableau de bord temps reel', 'Une lecture immediate des risques, des echeances et du niveau de preparation audit.'],
+                ['02', '👷', 'Gestion salaries et habilitations', 'Suivi des formations, CACES, habilitations, visites et renouvellements.'],
+                ['03', '🤖', 'Generateur de documents par IA', 'Creez plus vite vos trames, procedures et documents de preuve.'],
+                ['04', '🧭', "Preparation d'audit guidee", 'Des etapes concretes et un plan d\'action visible.'],
+              ].map(([num, emoji, title, desc], i) => (
+                <article className={`feature-card glass hover-glow fade-in fade-delay-${(i % 4) + 1}`} key={title}>
+                  <div className="feature-top"><span className="feature-number">{num}</span><div className="feature-emoji">{emoji}</div></div>
+                  <h3>{title}</h3>
+                  <p>{desc}</p>
+                </article>
+              ))}
             </div>
-          </header>
+          </div>
+        </section>
 
-          <section className="p-6">
-            {page === 'dashboard' && <Dashboard />}
-            {page === 'salaries' && <Salaries />}
-            {page !== 'dashboard' && page !== 'salaries' && <Placeholder page={title} />}
-          </section>
-        </main>
-      </div>
-    </div>
-  )
-}
+        <section className="section" id="tarifs">
+          <div className="container">
+            <div className="pricing-head fade-in">
+              <div><div className="section-label">Tarifs</div><h2>Transparent. Sans surprise.</h2></div>
+              <div className="pricing-toggle glass" role="tablist" aria-label="Choix de periode de facturation">
+                <button className={`toggle-option ${period === 'monthly' ? 'active' : ''}`} type="button" onClick={() => setPeriod('monthly')}>Mensuel</button>
+                <button className={`toggle-option ${period === 'yearly' ? 'active' : ''}`} type="button" onClick={() => setPeriod('yearly')}>Annuel -20%</button>
+              </div>
+            </div>
+            <div className="pricing-grid">
+              {pricing.map((p, idx) => (
+                <article className={`price-card glass hover-glow fade-in fade-delay-${idx + 1} ${p.primary ? 'featured' : ''}`} key={p.name}>
+                  {p.primary && <div className="price-badge">Le plus populaire</div>}
+                  <h3>{p.name}</h3>
+                  <p>{p.desc}</p>
+                  <div className="price-amount"><strong>{period === 'yearly' ? p.yearly : p.monthly}</strong><span>{periodLabel}</span></div>
+                  <ul>{p.features.map((f) => <li key={f}>{f}</li>)}</ul>
+                  <a className={`btn ${p.primary ? 'btn-primary' : 'btn-secondary'}`} href="#cta-final">{p.cta}</a>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
 
-function Dashboard() {
-  const cards = [
-    { label: 'Conformité globale', value: '94%', sub: 'MASE 91% · ISO 97%' },
-    { label: 'Alertes actives', value: '3', sub: '2 urgentes · 1 bientôt' },
-    { label: 'Documents à jour', value: '47/50', sub: '94% de conformité documentaire' },
-    { label: 'Prochain audit MASE', value: 'J-42', sub: '14 mai 2026 · APAVE' },
-  ]
+        <section className="section" id="faq">
+          <div className="container faq-wrap">
+            <div className="fade-in" style={{ marginBottom: 24 }}><div className="section-label">FAQ</div><h2>Questions frequentes</h2></div>
+            <div className="faq-list">
+              {faqs.map((item, idx) => {
+                const isOpen = openFaq === idx
+                return (
+                  <article key={item.q} className={`faq-item glass fade-in fade-delay-${(idx % 4) + 1} ${isOpen ? 'open' : ''}`}>
+                    <button className="faq-question" type="button" aria-expanded={isOpen} onClick={() => setOpenFaq(isOpen ? null : idx)}>
+                      <span>{item.q}</span><span className="faq-icon" aria-hidden="true" />
+                    </button>
+                    <div className="faq-answer" style={{ maxHeight: isOpen ? 240 : 0 }}>
+                      <div className="faq-answer-inner"><p>{item.a}</p></div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+        </section>
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="mb-1 text-xs uppercase tracking-[0.2em] text-[var(--accent)]">Bonjour</p>
-        <h2 className="font-display text-3xl font-black">Bonjour, Sarah 👋</h2>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-4">
-        {cards.map((card) => (
-          <article key={card.label} className="glass rounded-3xl p-5">
-            <p className="text-xs uppercase tracking-[0.12em] text-white/50">{card.label}</p>
-            <p className="mt-2 font-display text-4xl font-black">{card.value}</p>
-            <p className="mt-2 text-sm text-white/60">{card.sub}</p>
-          </article>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function Salaries() {
-  return (
-    <div className="glass overflow-hidden rounded-3xl">
-      <table className="w-full text-sm">
-        <thead className="bg-white/5 text-left text-xs uppercase tracking-[0.12em] text-white/60">
-          <tr>
-            <th className="px-4 py-3">Salarié</th>
-            <th className="px-4 py-3">Poste</th>
-            <th className="px-4 py-3">Conformité</th>
-            <th className="px-4 py-3">Statut</th>
-          </tr>
-        </thead>
-        <tbody>
-          {salaries.map((row) => (
-            <tr key={row.name} className="border-t border-white/10">
-              <td className="px-4 py-3 font-semibold">{row.name}</td>
-              <td className="px-4 py-3 text-white/70">{row.role}</td>
-              <td className="px-4 py-3">{row.compliance}%</td>
-              <td className="px-4 py-3">
-                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs">{row.status}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function Placeholder({ page }: { page: string }) {
-  return (
-    <div className="glass rounded-3xl p-10 text-center">
-      <h3 className="font-display text-2xl font-black">{page}</h3>
-      <p className="mt-3 text-white/65">Cette section est prête pour brancher les données métier, graphiques et actions avancées.</p>
-    </div>
+        <section className="section final-cta" id="cta-final">
+          <div className="container">
+            <div className="cta-panel glass fade-in">
+              <div className="section-label" style={{ justifyContent: 'center' }}>Derniere etape</div>
+              <h2>Pret a securiser vos certifications ?</h2>
+              <p>Structurez vos echeances, centralisez vos preuves et transformez vos audits en routine maitrisee.</p>
+              <a className="btn btn-primary" href="#top">Demarrer l'essai gratuit</a>
+            </div>
+          </div>
+        </section>
+      </main>
+    </>
   )
 }
