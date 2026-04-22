@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 
 type Period = 'monthly' | 'yearly'
 type Mode = 'login' | 'register'
+type DashboardPage = 'dashboard' | 'salaries' | 'documents' | 'audit' | 'reporting'
 
 type User = { id: string; email: string; name: string }
 type DashboardData = { kpis: { label: string; value: string; sub: string }[]; alerts: { title: string; status: string }[] }
@@ -20,11 +21,20 @@ const faqs = [
   { q: 'Comment les donnees sont securisees ?', a: 'Acces JWT, mots de passe hashes bcrypt, et segregation par utilisateur.' },
 ]
 
+const sidebarItems: { id: DashboardPage; label: string }[] = [
+  { id: 'dashboard', label: 'Tableau de bord' },
+  { id: 'salaries', label: 'Salariés & habilitations' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'audit', label: 'Préparation audit' },
+  { id: 'reporting', label: 'Reporting' },
+]
+
 export default function App() {
   const [scrolled, setScrolled] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [mode, setMode] = useState<Mode>('login')
+  const [activePage, setActivePage] = useState<DashboardPage>('dashboard')
 
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('konform_token'))
   const [user, setUser] = useState<User | null>(null)
@@ -72,9 +82,9 @@ export default function App() {
         ])
 
         if (!meRes.ok || !dataRes.ok) throw new Error('Session invalide')
-
         const meJson = (await meRes.json()) as { user: User }
         const dashboardJson = (await dataRes.json()) as DashboardData
+
         setUser(meJson.user)
         setDashboard(dashboardJson)
       } catch {
@@ -124,31 +134,74 @@ export default function App() {
 
   if (user && dashboard) {
     return (
-      <main className="dashboard-page">
-        <header className="site-header scrolled">
-          <div className="container nav">
-            <a className="logo" href="#"><span className="logo-mark">K</span><span>onform</span></a>
-            <div className="nav-links"><span className="nav-link">Connecté: {user.name}</span></div>
-            <div className="nav-actions"><button className="btn btn-secondary" onClick={logout}>Déconnexion</button></div>
+      <div className="app-shell">
+        <aside className="dash-sidebar glass">
+          <a className="logo" href="#"><span className="logo-mark">K</span><span>onform</span></a>
+          <div className="profile-box">
+            <strong>{user.name}</strong>
+            <span>{user.email}</span>
           </div>
-        </header>
-        <section className="section" style={{ paddingTop: 110 }}>
-          <div className="container">
-            <div className="section-label">Tableau de bord</div>
-            <h2 style={{ maxWidth: 'none' }}>Bonjour {user.name}, voici VOS données.</h2>
-            <div className="pricing-grid" style={{ marginTop: 20 }}>
-              {dashboard.kpis.map((kpi) => (
-                <article key={kpi.label} className="price-card glass"><h3>{kpi.label}</h3><div className="price-amount"><strong>{kpi.value}</strong></div><p>{kpi.sub}</p></article>
-              ))}
+          <nav className="side-nav-list">
+            {sidebarItems.map((item) => (
+              <button key={item.id} className={`side-nav-btn ${activePage === item.id ? 'active' : ''}`} onClick={() => setActivePage(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <button className="btn btn-secondary" onClick={logout}>Déconnexion</button>
+        </aside>
+
+        <main className="dash-main">
+          <header className="dash-header glass">
+            <div>
+              <h3>{sidebarItems.find((item) => item.id === activePage)?.label}</h3>
+              <p>Vue personnelle de conformité</p>
             </div>
-            <div className="faq-list" style={{ marginTop: 18 }}>
-              {dashboard.alerts.map((alert) => (
-                <article key={alert.title} className="faq-item glass"><div className="faq-answer-inner"><h4>{alert.title}</h4><p>Statut: {alert.status}</p></div></article>
-              ))}
-            </div>
-          </div>
-        </section>
-      </main>
+          </header>
+
+          {activePage === 'dashboard' && (
+            <section className="dash-content">
+              <div className="kpi-grid">
+                {dashboard.kpis.map((kpi) => (
+                  <article key={kpi.label} className="kpi-card glass">
+                    <span>{kpi.label}</span>
+                    <strong>{kpi.value}</strong>
+                    <p>{kpi.sub}</p>
+                  </article>
+                ))}
+              </div>
+
+              <article className="table-card glass">
+                <div className="table-headline">
+                  <h4>Alertes prioritaires</h4>
+                </div>
+                <table>
+                  <thead>
+                    <tr><th>Action</th><th>Statut</th></tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.alerts.map((alert) => (
+                      <tr key={alert.title}>
+                        <td>{alert.title}</td>
+                        <td><span className="status urgent">{alert.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </article>
+            </section>
+          )}
+
+          {activePage !== 'dashboard' && (
+            <section className="dash-content">
+              <article className="glass table-card">
+                <h4>{sidebarItems.find((item) => item.id === activePage)?.label}</h4>
+                <p style={{ marginTop: 8 }}>Section conservée dans la structure: navigation latérale, header, et espace contenu prêt à brancher les données détaillées.</p>
+              </article>
+            </section>
+          )}
+        </main>
+      </div>
     )
   }
 
@@ -168,7 +221,7 @@ export default function App() {
             <div className="hero-copy fade-in">
               <div className="hero-badge"><span className="pulse-dot" />Certifications MASE & ISO - Nouvelle approche</div>
               <h1>La conformite, enfin sous controle.</h1>
-              <p className="hero-subtitle">Inscrivez-vous puis connectez-vous directement ici. Après connexion, vous arrivez sur votre tableau de bord personnel.</p>
+              <p className="hero-subtitle">Inscrivez-vous puis connectez-vous directement ici.</p>
             </div>
             <div id="auth" className="mini-dashboard glass hover-glow fade-in fade-delay-2 auth-card">
               <div className="mini-top"><h3>{mode === 'login' ? 'Connexion' : 'Inscription'}</h3></div>
@@ -177,11 +230,9 @@ export default function App() {
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required />
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mot de passe" minLength={6} required />
                 {msg && <p className="auth-msg">{msg}</p>}
-                <button disabled={loading} className="btn btn-primary" type="submit">{loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : "Créer mon compte"}</button>
+                <button disabled={loading} className="btn btn-primary" type="submit">{loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}</button>
               </form>
-              <button className="auth-switch" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-                {mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
-              </button>
+              <button className="auth-switch" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}</button>
             </div>
           </div>
         </section>
@@ -199,7 +250,8 @@ export default function App() {
               {pricing.map((p) => (
                 <article className={`price-card glass hover-glow ${p.primary ? 'featured' : ''}`} key={p.name}>
                   {p.primary && <div className="price-badge">Le plus populaire</div>}
-                  <h3>{p.name}</h3><p>{p.desc}</p>
+                  <h3>{p.name}</h3>
+                  <p>{p.desc}</p>
                   <div className="price-amount"><strong>{period === 'yearly' ? p.yearly : p.monthly}</strong><span>{periodLabel}</span></div>
                   <a className={`btn ${p.primary ? 'btn-primary' : 'btn-secondary'}`} href="#auth">{p.cta}</a>
                 </article>
