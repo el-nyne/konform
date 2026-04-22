@@ -1,0 +1,34 @@
+services:
+  konform_frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: konform_frontend
+    restart: unless-stopped
+    depends_on:
+      - konform_api
+    ports:
+      - "8082:80"
+    networks:
+      - konform_net
+
+  konform_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: konform_api
+    restart: unless-stopped
+    environment:
+      - PORT=8083
+      - JWT_SECRET=change-this-secret
+      - CLIENT_ORIGIN=*
+    expose:
+      - "8083"
+    volumes:
+      - ./backend/data:/app/data
+    networks:
+      - konform_net
+
+networks:
+  konform_net:
+    name: konform_net
