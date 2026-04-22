@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+dist/
+build/
+.next/
+coverage/
+logs/
+*.log
+Dockerfile.local
+docker-data/
+tmp/
+.cache/
