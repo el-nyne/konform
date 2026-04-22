@@ -1,65 +1,40 @@
-import { useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 
 type Period = 'monthly' | 'yearly'
+type Mode = 'login' | 'register'
 
-type Faq = {
-  q: string
-  a: string
-}
+type User = { id: string; email: string; name: string }
+type DashboardData = { kpis: { label: string; value: string; sub: string }[]; alerts: { title: string; status: string }[] }
+
+const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 const pricing = [
-  {
-    name: 'Starter',
-    desc: "Pour structurer rapidement la conformite d'une petite equipe industrielle.",
-    monthly: '99€',
-    yearly: '79€',
-    cta: 'Choisir Starter',
-    primary: false,
-    features: ['Jusqu\'a 10 salaries', 'Suivi des echeances cles', 'Tableau de bord centralise', 'Support email'],
-  },
-  {
-    name: 'Pro',
-    desc: 'Le meilleur equilibre pour une PME qui prepare serieusement ses audits.',
-    monthly: '199€',
-    yearly: '159€',
-    cta: 'Choisir Pro',
-    primary: true,
-    features: ['Jusqu\'a 30 salaries', 'Relances automatiques', 'Documents assistes par IA', "Preparation d'audit guidee"],
-  },
-  {
-    name: 'Business',
-    desc: 'Pour les structures multi-sites qui veulent industrialiser leur conformite.',
-    monthly: '399€',
-    yearly: '319€',
-    cta: 'Choisir Business',
-    primary: false,
-    features: ['Jusqu\'a 100 salaries', 'Gestion multi-sites', 'Exports audit avances', 'Accompagnement prioritaire'],
-  },
+  { name: 'Starter', desc: "Pour structurer rapidement la conformite d'une petite equipe industrielle.", monthly: '99€', yearly: '79€', cta: 'Choisir Starter', primary: false },
+  { name: 'Pro', desc: 'Le meilleur equilibre pour une PME qui prepare serieusement ses audits.', monthly: '199€', yearly: '159€', cta: 'Choisir Pro', primary: true },
+  { name: 'Business', desc: 'Pour les structures multi-sites qui veulent industrialiser leur conformite.', monthly: '399€', yearly: '319€', cta: 'Choisir Business', primary: false },
 ]
 
-const faqs: Faq[] = [
-  {
-    q: 'Quelles certifications sont couvertes ?',
-    a: 'Konform est pense pour piloter les exigences MASE et differents cadres ISO avec un suivi operationnel des preuves, habilitations et echeances.',
-  },
-  {
-    q: 'Faut-il etre expert QSE pour utiliser Konform ?',
-    a: "Non. L'interface est concue pour rester lisible cote terrain, RH ou direction, avec des reperes simples et des actions guidees.",
-  },
-  {
-    q: 'Comment les donnees sont-elles securisees ?',
-    a: "Les acces sont organises par roles, les actions sont tracables et l'hebergement est prevu en France.",
-  },
-  {
-    q: "Que se passe-t-il a la fin de l'essai gratuit ?",
-    a: 'Vous choisissez librement de continuer sur un plan payant ou d\'arreter.',
-  },
+const faqs = [
+  { q: 'Quelles certifications sont couvertes ?', a: 'MASE et differents cadres ISO avec suivi operationnel.' },
+  { q: 'Faut-il etre expert QSE ?', a: "Non. L'interface est concue pour rester simple et actionnable." },
+  { q: 'Comment les donnees sont securisees ?', a: 'Acces JWT, mots de passe hashes bcrypt, et segregation par utilisateur.' },
 ]
 
 export default function App() {
   const [scrolled, setScrolled] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [mode, setMode] = useState<Mode>('login')
+
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('konform_token'))
+  const [user, setUser] = useState<User | null>(null)
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [msg, setMsg] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12)
@@ -70,42 +45,120 @@ export default function App() {
 
   useEffect(() => {
     const items = Array.from(document.querySelectorAll<HTMLElement>('.fade-in'))
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible')
-            observer.unobserve(entry.target)
-          }
-        })
-      },
-      { threshold: 0.14, rootMargin: '0px 0px -48px 0px' },
-    )
-
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible')
+          observer.unobserve(entry.target)
+        }
+      })
+    }, { threshold: 0.14, rootMargin: '0px 0px -48px 0px' })
     items.forEach((item) => observer.observe(item))
     return () => observer.disconnect()
-  }, [])
+  }, [token])
+
+  useEffect(() => {
+    if (!token) {
+      setUser(null)
+      setDashboard(null)
+      return
+    }
+
+    const load = async () => {
+      try {
+        const [meRes, dataRes] = await Promise.all([
+          fetch(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/dashboard`, { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+
+        if (!meRes.ok || !dataRes.ok) throw new Error('Session invalide')
+
+        const meJson = (await meRes.json()) as { user: User }
+        const dashboardJson = (await dataRes.json()) as DashboardData
+        setUser(meJson.user)
+        setDashboard(dashboardJson)
+      } catch {
+        localStorage.removeItem('konform_token')
+        setToken(null)
+        setMsg('Session expirée, reconnectez-vous.')
+      }
+    }
+
+    load()
+  }, [token])
 
   const periodLabel = useMemo(() => (period === 'yearly' ? '/mois, facture annuellement' : '/mois'), [period])
 
+  const submitAuth = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setMsg('')
+
+    try {
+      const endpoint = mode === 'login' ? 'login' : 'register'
+      const payload = mode === 'login' ? { email, password } : { name, email, password }
+      const res = await fetch(`${API_URL}/auth/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erreur')
+
+      localStorage.setItem('konform_token', json.token)
+      setToken(json.token)
+      setPassword('')
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Erreur inconnue')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const logout = () => {
+    localStorage.removeItem('konform_token')
+    setToken(null)
+    setUser(null)
+    setDashboard(null)
+  }
+
+  if (user && dashboard) {
+    return (
+      <main className="dashboard-page">
+        <header className="site-header scrolled">
+          <div className="container nav">
+            <a className="logo" href="#"><span className="logo-mark">K</span><span>onform</span></a>
+            <div className="nav-links"><span className="nav-link">Connecté: {user.name}</span></div>
+            <div className="nav-actions"><button className="btn btn-secondary" onClick={logout}>Déconnexion</button></div>
+          </div>
+        </header>
+        <section className="section" style={{ paddingTop: 110 }}>
+          <div className="container">
+            <div className="section-label">Tableau de bord</div>
+            <h2 style={{ maxWidth: 'none' }}>Bonjour {user.name}, voici VOS données.</h2>
+            <div className="pricing-grid" style={{ marginTop: 20 }}>
+              {dashboard.kpis.map((kpi) => (
+                <article key={kpi.label} className="price-card glass"><h3>{kpi.label}</h3><div className="price-amount"><strong>{kpi.value}</strong></div><p>{kpi.sub}</p></article>
+              ))}
+            </div>
+            <div className="faq-list" style={{ marginTop: 18 }}>
+              {dashboard.alerts.map((alert) => (
+                <article key={alert.title} className="faq-item glass"><div className="faq-answer-inner"><h4>{alert.title}</h4><p>Statut: {alert.status}</p></div></article>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <>
-      <header className={`site-header ${scrolled ? 'scrolled' : ''}`} id="site-header">
+      <header className={`site-header ${scrolled ? 'scrolled' : ''}`}>
         <div className="container nav">
-          <a className="logo" href="#top" aria-label="Konform accueil">
-            <span className="logo-mark">K</span>
-            <span>onform</span>
-          </a>
-          <nav className="nav-links" aria-label="Navigation principale">
-            <a className="nav-link" href="#produit">Produit</a>
-            <a className="nav-link" href="#fonctionnalites">Fonctionnalites</a>
-            <a className="nav-link" href="#tarifs">Tarifs</a>
-            <a className="nav-link" href="#faq">FAQ</a>
-          </nav>
-          <div className="nav-actions">
-            <a className="btn btn-secondary" href="#faq">Se connecter</a>
-            <a className="btn btn-primary" href="#cta-final">Essai gratuit</a>
-          </div>
+          <a className="logo" href="#top"><span className="logo-mark">K</span><span>onform</span></a>
+          <nav className="nav-links"><a className="nav-link" href="#produit">Produit</a><a className="nav-link" href="#tarifs">Tarifs</a><a className="nav-link" href="#faq">FAQ</a></nav>
+          <div className="nav-actions"><a className="btn btn-primary" href="#auth">Connexion</a></div>
         </div>
       </header>
 
@@ -115,60 +168,20 @@ export default function App() {
             <div className="hero-copy fade-in">
               <div className="hero-badge"><span className="pulse-dot" />Certifications MASE & ISO - Nouvelle approche</div>
               <h1>La conformite, enfin sous controle.</h1>
-              <p className="hero-subtitle">Konform centralise vos certifications MASE et ISO. Habilitations, documents, audits - tout est automatise.</p>
-              <div className="hero-actions">
-                <a className="btn btn-primary" href="#cta-final">Demarrer gratuitement -&gt;</a>
-                <a className="btn btn-secondary" href="#dashboard">Voir la demo</a>
-                <span className="eyebrow-note">Aucune carte bancaire requise</span>
-              </div>
-              <div className="stat-bar glass">
-                <div className="stat-chip"><strong>3h</strong><span>/ semaine economisees</span></div>
-                <div className="stat-chip"><strong>0</strong><span>certification perdue</span></div>
-                <div className="stat-chip"><strong>14 jours</strong><span>d'essai offerts</span></div>
-              </div>
+              <p className="hero-subtitle">Inscrivez-vous puis connectez-vous directement ici. Après connexion, vous arrivez sur votre tableau de bord personnel.</p>
             </div>
-
-            <div className="hero-side fade-in fade-delay-2">
-              <div className="mini-dashboard glass hover-glow">
-                <div className="mini-top">
-                  <div><div className="mini-tag">Dashboard</div><h3>Vision temps reel de votre conformite</h3></div>
-                  <span className="badge">Audit pret</span>
-                </div>
-                <div className="mini-summary">
-                  <div className="mini-box"><span>Score site</span><strong>94%</strong></div>
-                  <div className="mini-box"><span>Echeances a traiter</span><strong>3</strong></div>
-                  <div className="mini-box"><span>Docs conformes</span><strong>47/50</strong></div>
-                </div>
-                <div className="mini-list">
-                  <div className="mini-row"><div><strong>Nadia M.</strong><br /><span>Travaux en hauteur</span></div><div>Validite 28/09/2026</div><span className="status ok">A jour</span></div>
-                  <div className="mini-row"><div><strong>Lucas P.</strong><br /><span>CACES R489</span></div><div>Validite 19/05/2026</div><span className="status warn">Bientot</span></div>
-                  <div className="mini-row"><div><strong>Thomas G.</strong><br /><span>Habilitation BT</span></div><div>Validite 08/04/2026</div><span className="status urgent">Urgent</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="fonctionnalites">
-          <div className="container">
-            <div className="fade-in" style={{ maxWidth: 760, marginBottom: 30 }}>
-              <div className="section-label">La solution</div>
-              <h2>Tout ce dont vous avez besoin. Rien de superflu.</h2>
-              <p>Konform se concentre sur les gestes vraiment utiles pour piloter MASE et ISO dans une PME industrielle.</p>
-            </div>
-            <div className="feature-grid">
-              {[
-                ['01', '📊', 'Tableau de bord temps reel', 'Une lecture immediate des risques, des echeances et du niveau de preparation audit.'],
-                ['02', '👷', 'Gestion salaries et habilitations', 'Suivi des formations, CACES, habilitations, visites et renouvellements.'],
-                ['03', '🤖', 'Generateur de documents par IA', 'Creez plus vite vos trames, procedures et documents de preuve.'],
-                ['04', '🧭', "Preparation d'audit guidee", 'Des etapes concretes et un plan d\'action visible.'],
-              ].map(([num, emoji, title, desc], i) => (
-                <article className={`feature-card glass hover-glow fade-in fade-delay-${(i % 4) + 1}`} key={title}>
-                  <div className="feature-top"><span className="feature-number">{num}</span><div className="feature-emoji">{emoji}</div></div>
-                  <h3>{title}</h3>
-                  <p>{desc}</p>
-                </article>
-              ))}
+            <div id="auth" className="mini-dashboard glass hover-glow fade-in fade-delay-2 auth-card">
+              <div className="mini-top"><h3>{mode === 'login' ? 'Connexion' : 'Inscription'}</h3></div>
+              <form onSubmit={submitAuth} className="auth-form">
+                {mode === 'register' && <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom" required />}
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mot de passe" minLength={6} required />
+                {msg && <p className="auth-msg">{msg}</p>}
+                <button disabled={loading} className="btn btn-primary" type="submit">{loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : "Créer mon compte"}</button>
+              </form>
+              <button className="auth-switch" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+                {mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+              </button>
             </div>
           </div>
         </section>
@@ -177,20 +190,18 @@ export default function App() {
           <div className="container">
             <div className="pricing-head fade-in">
               <div><div className="section-label">Tarifs</div><h2>Transparent. Sans surprise.</h2></div>
-              <div className="pricing-toggle glass" role="tablist" aria-label="Choix de periode de facturation">
+              <div className="pricing-toggle glass">
                 <button className={`toggle-option ${period === 'monthly' ? 'active' : ''}`} type="button" onClick={() => setPeriod('monthly')}>Mensuel</button>
                 <button className={`toggle-option ${period === 'yearly' ? 'active' : ''}`} type="button" onClick={() => setPeriod('yearly')}>Annuel -20%</button>
               </div>
             </div>
             <div className="pricing-grid">
-              {pricing.map((p, idx) => (
-                <article className={`price-card glass hover-glow fade-in fade-delay-${idx + 1} ${p.primary ? 'featured' : ''}`} key={p.name}>
+              {pricing.map((p) => (
+                <article className={`price-card glass hover-glow ${p.primary ? 'featured' : ''}`} key={p.name}>
                   {p.primary && <div className="price-badge">Le plus populaire</div>}
-                  <h3>{p.name}</h3>
-                  <p>{p.desc}</p>
+                  <h3>{p.name}</h3><p>{p.desc}</p>
                   <div className="price-amount"><strong>{period === 'yearly' ? p.yearly : p.monthly}</strong><span>{periodLabel}</span></div>
-                  <ul>{p.features.map((f) => <li key={f}>{f}</li>)}</ul>
-                  <a className={`btn ${p.primary ? 'btn-primary' : 'btn-secondary'}`} href="#cta-final">{p.cta}</a>
+                  <a className={`btn ${p.primary ? 'btn-primary' : 'btn-secondary'}`} href="#auth">{p.cta}</a>
                 </article>
               ))}
             </div>
@@ -199,32 +210,19 @@ export default function App() {
 
         <section className="section" id="faq">
           <div className="container faq-wrap">
-            <div className="fade-in" style={{ marginBottom: 24 }}><div className="section-label">FAQ</div><h2>Questions frequentes</h2></div>
-            <div className="faq-list">
+            <div className="section-label">FAQ</div><h2>Questions frequentes</h2>
+            <div className="faq-list" style={{ marginTop: 20 }}>
               {faqs.map((item, idx) => {
                 const isOpen = openFaq === idx
                 return (
-                  <article key={item.q} className={`faq-item glass fade-in fade-delay-${(idx % 4) + 1} ${isOpen ? 'open' : ''}`}>
-                    <button className="faq-question" type="button" aria-expanded={isOpen} onClick={() => setOpenFaq(isOpen ? null : idx)}>
-                      <span>{item.q}</span><span className="faq-icon" aria-hidden="true" />
+                  <article className={`faq-item glass ${isOpen ? 'open' : ''}`} key={item.q}>
+                    <button className="faq-question" type="button" onClick={() => setOpenFaq(isOpen ? null : idx)}>
+                      <span>{item.q}</span><span className="faq-icon" />
                     </button>
-                    <div className="faq-answer" style={{ maxHeight: isOpen ? 240 : 0 }}>
-                      <div className="faq-answer-inner"><p>{item.a}</p></div>
-                    </div>
+                    <div className="faq-answer" style={{ maxHeight: isOpen ? 180 : 0 }}><div className="faq-answer-inner"><p>{item.a}</p></div></div>
                   </article>
                 )
               })}
-            </div>
-          </div>
-        </section>
-
-        <section className="section final-cta" id="cta-final">
-          <div className="container">
-            <div className="cta-panel glass fade-in">
-              <div className="section-label" style={{ justifyContent: 'center' }}>Derniere etape</div>
-              <h2>Pret a securiser vos certifications ?</h2>
-              <p>Structurez vos echeances, centralisez vos preuves et transformez vos audits en routine maitrisee.</p>
-              <a className="btn btn-primary" href="#top">Demarrer l'essai gratuit</a>
             </div>
           </div>
         </section>

@@ -1,69 +1,57 @@
-# Konform (frontend)
+# Konform (landing + auth + dashboard)
 
-Ce dépôt peut cohabiter avec ton autre SaaS sur **le même VPS** sans conflit, à condition d'isoler :
+Cette stack inclut maintenant :
 
-- les ports internes Docker,
-- les noms de services,
-- les volumes,
-- et le routage Nginx (par sous-domaine recommandé).
+- Frontend React (landing + connexion/inscription)
+- API Node/Express (JWT + bcrypt)
+- Données utilisateur isolées (chaque utilisateur voit **ses** KPI)
 
-## 1) Architecture recommandée (cohabitation propre)
+## Ports choisis (compatibles avec ton VPS)
 
-Utilise des sous-domaines séparés :
+Tu as déjà des services sur `3000`, `5432`, `8080`.
 
-- `app1.tondomaine.com` → ton SaaS existant
-- `konform.tondomaine.com` → ce frontend Konform
+Cette stack utilise volontairement :
 
-Chaque app tourne dans ses conteneurs, et un reverse-proxy Nginx (host ou container dédié) distribue le trafic selon le `server_name`.
+- `127.0.0.1:8082` → frontend Konform
+- `127.0.0.1:8083` → API Konform
 
-## 2) Démarrage local en Docker (Konform)
+Aucun conflit avec tes ports existants.
 
-### Build + run
+## Lancer
 
 ```bash
 docker compose up -d --build
 ```
 
-Le conteneur expose le site sur le port `8082` de l'hôte.
+## Nginx host
 
-## 3) Nginx sur le VPS : 2 apps séparées
+Utilise `nginx/konform.conf` :
 
-Si Nginx tourne sur l'hôte, ajoute un vhost pour Konform (fichier exemple fourni : `nginx/konform.conf`).
+- `/` vers `127.0.0.1:8082`
+- `/api/` vers `127.0.0.1:8083`
 
-- ton SaaS existant garde son bloc `server` actuel
-- Konform a son propre bloc `server` avec `proxy_pass http://127.0.0.1:8082;`
-
-Ensuite :
+Puis :
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 4) SSL (Let's Encrypt)
+## Flux utilisateur
 
-Exemple :
+1. L'utilisateur arrive sur la landing page.
+2. Il s'inscrit ou se connecte depuis la landing.
+3. Le frontend stocke le JWT et appelle `/api/me` + `/api/dashboard`.
+4. L'utilisateur est redirigé vers son dashboard avec ses propres données.
 
-```bash
-sudo certbot --nginx -d konform.tondomaine.com
-```
+## Sécurité minimale implémentée
 
-## 5) Déploiement standard sur VPS
+- Hash des mots de passe avec `bcryptjs`
+- Auth stateless avec JWT (`Authorization: Bearer <token>`)
+- Middleware d'auth sur endpoints privés
 
-```bash
-git pull
-docker compose up -d --build
-```
+⚠️ Pour production :
 
-## 6) Points critiques pour cohabiter sans casse
-
-1. **Ports uniques**: ne jamais réutiliser un port déjà pris par l'autre SaaS.
-2. **Noms de conteneurs uniques**: éviter les collisions globales Docker.
-3. **Réseaux/volumes distincts**: préfixes dédiés (`konform_*`).
-4. **Sous-domaines séparés**: simplifie SSL, logs, et maintenance.
-5. **Healthcheck**: détecte vite une régression au déploiement.
-
-## 7) Option alternative (sans Nginx host)
-
-Tu peux aussi avoir un **reverse-proxy Docker unique** (Traefik/Nginx Proxy Manager) qui route vers tes deux stacks Docker.
-Le principe reste identique: deux services isolés, deux hostnames différents.
+- change `JWT_SECRET`
+- active HTTPS (Let's Encrypt)
+- ajoute rate limit / logs / sauvegarde du fichier `backend/data/users.json`
