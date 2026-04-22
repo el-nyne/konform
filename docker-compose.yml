@@ -1,0 +1,15 @@
+services:
+  konform_frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: konform_frontend
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    networks:
+      - konform_net
+
+networks:
+  konform_net:
+    name: konform_net
