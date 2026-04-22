@@ -1,48 +1,39 @@
 # Konform (landing + auth + dashboard)
 
-Cette stack inclut maintenant :
+Cette stack inclut :
 
 - Frontend React (landing + connexion/inscription)
 - API Node/Express (JWT + bcrypt)
 - Données utilisateur isolées (chaque utilisateur voit **ses** KPI)
 
-## Ports choisis (compatibles avec ton VPS)
+## Pourquoi la connexion ne marchait pas
 
-Tu as déjà des services sur `3000`, `5432`, `8080`.
+Si tu ouvres `http://IP:8082`, le frontend devait appeler `/api/...` sur le **même port**.
 
-Cette stack utilise volontairement :
+Avant, le Nginx du conteneur frontend ne proxyfiais pas `/api` vers l'API, donc les appels login/register échouaient.
 
-- `127.0.0.1:8082` → frontend Konform
-- `127.0.0.1:8083` → API Konform
+✅ Correction faite :
 
-Aucun conflit avec tes ports existants.
+- `nginx/default.conf` proxy maintenant `/api/` vers `konform_api:8083`
+- `docker-compose` met `frontend` et `api` sur le même réseau Docker
+- le frontend est exposé en `8082:80` (accessible depuis ton IP)
 
-## Lancer
+## Lancer / relancer
 
 ```bash
+docker compose down
 docker compose up -d --build
 ```
 
-## Nginx host
+Puis teste :
 
-Utilise `nginx/konform.conf` :
+- Front: `http://TON_IP:8082`
+- Health API via frontend proxy: `http://TON_IP:8082/api/health`
 
-- `/` vers `127.0.0.1:8082`
-- `/api/` vers `127.0.0.1:8083`
+## Ports
 
-Puis :
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## Flux utilisateur
-
-1. L'utilisateur arrive sur la landing page.
-2. Il s'inscrit ou se connecte depuis la landing.
-3. Le frontend stocke le JWT et appelle `/api/me` + `/api/dashboard`.
-4. L'utilisateur est redirigé vers son dashboard avec ses propres données.
+- `8082` public: frontend + proxy `/api`
+- `8083` non publié publiquement (interne Docker via `expose`)
 
 ## Sécurité minimale implémentée
 

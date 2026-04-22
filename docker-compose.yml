@@ -5,8 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: konform_frontend
     restart: unless-stopped
+    depends_on:
+      - konform_api
     ports:
-      - "127.0.0.1:8082:80"
+      - "8082:80"
     networks:
       - konform_net
 
@@ -20,8 +22,8 @@ services:
       - PORT=8083
       - JWT_SECRET=change-this-secret
       - CLIENT_ORIGIN=*
-    ports:
-      - "127.0.0.1:8083:8083"
+    expose:
+      - "8083"
     volumes:
       - ./backend/data:/app/data
     networks:
